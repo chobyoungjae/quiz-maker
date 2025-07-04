@@ -52,16 +52,20 @@ def main():
     if not session.get("login"):
         return redirect(url_for("login"))
     result = None
+    error = None
     if request.method == "POST":
         topic = request.form["topic"]
         prompt = f"""
 Create 10 quiz questions about '{topic}'.\nAll questions must be based on the standards and regulations of the Republic of Korea, for food companies, and specifically for HACCP-certified companies.\nQuestions 1-5 must be multiple choice (with 4 options), and questions 6-10 must be short answer.\nFor each question, provide the answer and a brief explanation.\nAll questions must be directly related to the topic.\nAll questions, answers, and explanations must be written in Korean.\nFormat:\n1. (Multiple choice question)\n   1) Option1 2) Option2 3) Option3 4) Option4\n   Answer: (Correct answer)\n   Explanation: (Explanation)\n6. (Short answer question)\n   Answer: (Correct answer)\n   Explanation: (Explanation)\n"""
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        result = response.choices[0].message.content
-    return render_template_string(HTML_MAIN, result=result)
+        try:
+            response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            result = response.choices[0].message.content
+        except Exception as e:
+            error = str(e)
+    return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, error=error)
 
 @app.route("/logout")
 def logout():
