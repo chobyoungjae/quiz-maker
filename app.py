@@ -55,9 +55,11 @@ def main():
     error = None
     if request.method == "POST":
         topic = request.form["topic"]
-        prompt = f"""
-Create 10 quiz questions about '{topic}'.\nAll questions must be based on the standards and regulations of the Republic of Korea, for food companies, and specifically for HACCP-certified companies.\nQuestions 1-5 must be multiple choice (with 4 options), and questions 6-10 must be short answer.\nFor each question, provide the answer and a brief explanation.\nAll questions must be directly related to the topic.\nAll questions, answers, and explanations must be written in Korean.\nFormat:\n1. (Multiple choice question)\n   1) Option1 2) Option2 3) Option3 4) Option4\n   Answer: (Correct answer)\n   Explanation: (Explanation)\n6. (Short answer question)\n   Answer: (Correct answer)\n   Explanation: (Explanation)\n"""
+        # 규칙 파일 읽기
         try:
+            with open("rules.txt", "r", encoding="utf-8") as f:
+                rules = f.read()
+            prompt = rules.replace("{topic}", topic)
             response = openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}]
