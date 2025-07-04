@@ -1,14 +1,13 @@
-Create 10 quiz questions about '{topic}'.
-All questions must be based on the standards and regulations of the Republic of Korea, for food companies, and specifically for HACCP-certified companies.
-Questions 1-5 must be multiple choice (with 4 options), and questions 6-10 must be short answer.
-For each question, provide the answer and a brief explanation.
-All questions must be directly related to the topic.
-All questions, answers, and explanations must be written in Korean.
-Format:
-1. (Multiple choice question)
-   1) Option1 2) Option2 3) Option3 4) Option4
-   Answer: (Correct answer)
-   Explanation: (Explanation)
-6. (Short answer question)
-   Answer: (Correct answer)
-   Explanation: (Explanation) 
+'{topic}'에 대해 2020년 이후 시행된 대한민국 대학수학능력시험(수능) 또는 전국연합학력평가(모의고사) 영어영역 기출문제를 참고하여 10개의 문제를 만들어 주세요.
+모든 문제는 실제 기출 또는 모의고사 유형을 반영해야 하며, 난이도는 고등학생 수준으로 맞춰주세요.
+1~5번은 객관식 4지선다형, 6~10번은 주관식(서술형/단답형)으로 구성해 주세요.
+각 문제마다 정답과 간단한 해설을 반드시 포함해 주세요.
+모든 문제, 정답, 해설은 한국어로 작성해 주세요.
+형식 예시:
+1. (객관식 문제)
+   1) 보기1 2) 보기2 3) 보기3 4) 보기4
+   정답: (정답)
+   해설: (해설)
+6. (주관식 문제)
+   정답: (정답)
+   해설: (해설) 
