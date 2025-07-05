@@ -142,35 +142,34 @@ def parse_questions(text):
 
 @app.route("/create_form", methods=["POST"])
 def create_form():
-    """구글 설문지를 생성합니다."""
     try:
+        print("1. create_form 진입")
         data = request.get_json()
         questions_text = data.get('questions', '')
+        print("2. 받은 questions_text:", questions_text)
         
-        # Google API 인증
         creds = get_google_credentials()
+        print("3. 구글 인증 성공")
         forms_service = build('forms', 'v1', credentials=creds)
         drive_service = build('drive', 'v3', credentials=creds)
+        print("4. 구글 서비스 객체 생성 성공")
         
-        # 문제 파싱
         questions = parse_questions(questions_text)
+        print("5. 파싱된 questions:", questions)
         
-        # 구글 폼 생성
         form = {
             'info': {
                 'title': f'문제 시험 - {session.get("current_topic", "주제")}',
                 'documentTitle': f'문제 시험 - {session.get("current_topic", "주제")}'
             }
         }
-        
         created_form = forms_service.forms().create(body=form).execute()
         form_id = created_form['formId']
+        print("6. 폼 생성 성공, form_id:", form_id)
         
-        # 문제 추가
         requests = []
         for i, q in enumerate(questions):
-            if q['type'] == 'multiple_choice' and q['options']:
-                # 객관식 문제
+            if q['type'] == 'multiple_choice' and q.get('options'):
                 request_body = {
                     'createItem': {
                         'item': {
@@ -191,7 +190,6 @@ def create_form():
                     }
                 }
             else:
-                # 주관식 문제
                 request_body = {
                     'createItem': {
                         'item': {
@@ -210,22 +208,24 @@ def create_form():
                     }
                 }
             requests.append(request_body)
+        print("7. 문제 추가 요청 생성 완료")
         
-        # 폼에 문제 추가
         if requests:
             forms_service.forms().batchUpdate(
                 formId=form_id,
                 body={'requests': requests}
             ).execute()
+            print("8. 폼에 문제 추가 성공")
         
-        # 폼을 지정된 폴더로 이동
         drive_service.files().update(
             fileId=form_id,
             addParents=GOOGLE_DRIVE_FOLDER_ID,
             removeParents='root'
         ).execute()
+        print("9. 폼을 폴더로 이동 성공")
         
         form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
+        print("10. 최종 성공, form_url:", form_url)
         
         return jsonify({
             'success': True,
@@ -234,7 +234,7 @@ def create_form():
         })
         
     except Exception as e:
-        print("구글 설문지 생성 오류:", repr(e))  # 콘솔에 에러 메시지 출력 (더 자세히)
+        print("구글 설문지 생성 오류:", repr(e))
         error_msg = str(e) if str(e) else "알 수 없는 오류가 발생했습니다."
         return jsonify({
             'success': False,
