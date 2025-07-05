@@ -177,6 +177,7 @@ def create_form():
         requests = []
         for i, q in enumerate(questions):
             if q['type'] == 'multiple_choice' and q.get('options'):
+                # 객관식 문제
                 request_body = {
                     'createItem': {
                         'item': {
@@ -197,6 +198,7 @@ def create_form():
                     }
                 }
             else:
+                # 주관식 문제 (Google Forms API 파라미터 맞춤)
                 request_body = {
                     'createItem': {
                         'item': {
@@ -204,7 +206,7 @@ def create_form():
                             'questionItem': {
                                 'question': {
                                     'textQuestion': {
-                                        'type': 'SHORT_ANSWER'
+                                        'paragraph': False
                                     }
                                 }
                             }
