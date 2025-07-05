@@ -231,9 +231,11 @@ def create_form():
         })
         
     except Exception as e:
+        print("구글 설문지 생성 오류:", e)  # 콘솔에 에러 메시지 출력
+        error_msg = str(e) if str(e) else "알 수 없는 오류가 발생했습니다."
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': error_msg
         })
 
 @app.route("/", methods=["GET", "POST"])
