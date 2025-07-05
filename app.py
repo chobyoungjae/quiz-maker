@@ -111,14 +111,12 @@ def parse_questions(text):
     questions = []
     lines = text.split('\n')
     current_question = None
-    
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
-        # 객관식 문제 패턴 (1. 2. 3. 등)
-        if re.match(r'^\d+\.', line):
+        # 객관식 문제 패턴 (1. 2. 3. 4. 5. 6. 7.)
+        if re.match(r'^[1-7]\.', line):
             if current_question:
                 questions.append(current_question)
             current_question = {
@@ -127,9 +125,9 @@ def parse_questions(text):
                 'type': 'multiple_choice'
             }
         # 보기 패턴 (1) 2) 3) 4) 등)
-        elif re.match(r'^\d+\)', line) and current_question:
+        elif re.match(r'^\d+\)', line) and current_question and current_question.get('type') == 'multiple_choice':
             current_question['options'].append(line)
-        # 주관식 문제 패턴 (8. 9. 10. 등)
+        # 주관식 문제 패턴 (8. 9. 10.)
         elif re.match(r'^[8-9]\.|^10\.', line):
             if current_question:
                 questions.append(current_question)
@@ -137,10 +135,8 @@ def parse_questions(text):
                 'question': line,
                 'type': 'short_answer'
             }
-    
     if current_question:
         questions.append(current_question)
-    
     return questions
 
 @app.route("/create_form", methods=["POST"])
