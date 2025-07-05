@@ -295,6 +295,25 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+@app.route("/quick_form")
+def quick_form():
+    try:
+        creds = get_google_credentials()
+        forms_service = build('forms', 'v1', credentials=creds)
+        # 최소 폼 생성
+        form = {
+            'info': {
+                'title': '테스트 폼',
+                'documentTitle': '테스트 폼'
+            }
+        }
+        created_form = forms_service.forms().create(body=form).execute()
+        form_id = created_form['formId']
+        form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
+        return f"폼 생성 성공! <a href='{form_url}' target='_blank'>폼 열기</a>"
+    except Exception as e:
+        return f"폼 생성 실패: {e}"
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False) 
