@@ -124,9 +124,17 @@ def parse_questions(text):
                 'options': [],
                 'type': 'multiple_choice'
             }
-        # 보기 패턴 (1) 2) 3) 4) 등)
-        elif re.match(r'^\d+\)', line) and current_question and current_question.get('type') == 'multiple_choice':
-            current_question['options'].append(line)
+        # 보기 패턴 (한 줄에 여러 보기가 있는 경우 포함)
+        elif current_question and current_question.get('type') == 'multiple_choice':
+            # '1) 보기1 2) 보기2 3) 보기3 4) 보기4' 형식 분리
+            matches = re.findall(r'\d+\)\s*([^\d\)]+)', line)
+            if matches:
+                current_question['options'].extend([v.strip() for v in matches if v.strip()])
+            elif re.match(r'^\d+\)', line):
+                # 한 줄에 보기 하나만 있을 때
+                보기_텍스트 = re.sub(r'^\d+\)\s*', '', line)
+                if 보기_텍스트:
+                    current_question['options'].append(보기_텍스트)
         # 주관식 문제 패턴 (8. 9. 10.)
         elif re.match(r'^[8-9]\.|^10\.', line):
             if current_question:
