@@ -312,7 +312,9 @@ def quick_form():
         form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
         return f"폼 생성 성공! <a href='{form_url}' target='_blank'>폼 열기</a>"
     except Exception as e:
-        return f"폼 생성 실패: {e}"
+        import traceback
+        tb = traceback.format_exc()
+        return f"폼 생성 실패: {e}<br><pre>{tb}</pre>"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
