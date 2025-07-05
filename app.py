@@ -126,8 +126,8 @@ def parse_questions(text):
             }
         # 보기 패턴 (한 줄에 여러 보기가 있는 경우 포함)
         elif current_question and current_question.get('type') == 'multiple_choice':
-            # '1) 보기1 2) 보기2 3) 보기3 4) 보기4' 형식 분리 (정규식 개선)
-            matches = re.findall(r'\d+\)\s*([^)]*)', line)
+            # '1) 보기1 2) 보기2 3) 보기3 4) 보기4' 형식 분리 (최종 정규식)
+            matches = re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
             if matches:
                 current_question['options'].extend([v.strip() for v in matches if v.strip()])
             elif re.match(r'^\d+\)', line):
