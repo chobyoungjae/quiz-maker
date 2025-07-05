@@ -283,7 +283,7 @@ def main():
             # )
             # result = response.choices[0].message.content
             # === 임시 더미 데이터 ===
-            result = f"""{topic}에 대한 예시 문제\n1. {topic}의 정의는 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n2. {topic}의 주요 특징은 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n3. {topic}와 관련된 법규는 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n4. {topic}의 관리 방법은?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n5. {topic}의 중요성은 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n6. {topic}에 대해 서술하시오.\n7. {topic}의 실제 사례를 설명하시오.\n8. {topic}의 문제점은 무엇인가요?\n9. {topic} 개선 방안을 제시하시오.\n10. {topic} 관련 최신 동향을 설명하시오.\n"""
+            result = f"""{topic}에 대한 예시 문제\n1. {topic}의 정의는 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n2. {topic}의 주요 특징은 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n3. {topic}와 관련된 법규는 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n4. {topic}의 관리 방법은?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n5. {topic}의 중요성은 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n6. {topic}에 대해 서술하시오.\n7. {topic}의 실제 사례를 설명하시오.\n"""
         except Exception as e:
             error = str(e)
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, error=error)
