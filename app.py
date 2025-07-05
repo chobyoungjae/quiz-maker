@@ -1,4 +1,6 @@
-print("앱 시작됨")
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.info("앱 시작됨 (logging)")
 import os
 print("GOOGLE_SERVICE_ACCOUNT_KEY:", os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY"))
 
@@ -144,19 +146,19 @@ def parse_questions(text):
 @app.route("/create_form", methods=["POST"])
 def create_form():
     try:
-        print("1. create_form 진입")
+        logging.info("1. create_form 진입")
         data = request.get_json()
         questions_text = data.get('questions', '')
-        print("2. 받은 questions_text:", questions_text)
+        logging.info("2. 받은 questions_text: %s", questions_text)
         
         creds = get_google_credentials()
-        print("3. 구글 인증 성공")
+        logging.info("3. 구글 인증 성공")
         forms_service = build('forms', 'v1', credentials=creds)
         drive_service = build('drive', 'v3', credentials=creds)
-        print("4. 구글 서비스 객체 생성 성공")
+        logging.info("4. 구글 서비스 객체 생성 성공")
         
         questions = parse_questions(questions_text)
-        print("5. 파싱된 questions:", questions)
+        logging.info("5. 파싱된 questions: %s", questions)
         
         form = {
             'info': {
@@ -166,7 +168,7 @@ def create_form():
         }
         created_form = forms_service.forms().create(body=form).execute()
         form_id = created_form['formId']
-        print("6. 폼 생성 성공, form_id:", form_id)
+        logging.info("6. 폼 생성 성공, form_id: %s", form_id)
         
         requests = []
         for i, q in enumerate(questions):
@@ -209,24 +211,24 @@ def create_form():
                     }
                 }
             requests.append(request_body)
-        print("7. 문제 추가 요청 생성 완료")
+        logging.info("7. 문제 추가 요청 생성 완료")
         
         if requests:
             forms_service.forms().batchUpdate(
                 formId=form_id,
                 body={'requests': requests}
             ).execute()
-            print("8. 폼에 문제 추가 성공")
+            logging.info("8. 폼에 문제 추가 성공")
         
         drive_service.files().update(
             fileId=form_id,
             addParents=GOOGLE_DRIVE_FOLDER_ID,
             removeParents='root'
         ).execute()
-        print("9. 폼을 폴더로 이동 성공")
+        logging.info("9. 폼을 폴더로 이동 성공")
         
         form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
-        print("10. 최종 성공, form_url:", form_url)
+        logging.info("10. 최종 성공, form_url: %s", form_url)
         
         return jsonify({
             'success': True,
@@ -235,7 +237,7 @@ def create_form():
         })
         
     except Exception as e:
-        print("구글 설문지 생성 오류:", repr(e))
+        logging.error("구글 설문지 생성 오류: %r", e)
         error_msg = str(e) if str(e) else "알 수 없는 오류가 발생했습니다."
         return jsonify({
             'success': False,
