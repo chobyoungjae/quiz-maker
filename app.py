@@ -3,10 +3,7 @@ import openai
 import os
 import re
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-import pickle
 
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -87,32 +84,21 @@ function openDriveFolder() {
 
 def get_google_credentials():
     """Google API 인증 정보를 가져옵니다."""
-    creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+    try:
+        # 서비스 계정 키 JSON을 환경변수에서 가져옵니다
+        service_account_info = os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
+        if service_account_info:
+            import json
+            service_account_dict = json.loads(service_account_info)
+            creds = Credentials.from_service_account_info(
+                service_account_dict,
+                scopes=SCOPES
+            )
+            return creds
         else:
-            # 환경변수에서 인증 정보를 가져옵니다
-            client_config = {
-                "installed": {
-                    "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
-                    "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob"]
-                }
-            }
-            flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-            creds = flow.run_local_server(port=0)
-        
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-    
-    return creds
+            raise Exception("GOOGLE_SERVICE_ACCOUNT_KEY 환경변수가 설정되지 않았습니다.")
+    except Exception as e:
+        raise Exception(f"Google 인증 설정 오류: {str(e)}")
 
 def parse_questions(text):
     """문제 텍스트를 파싱하여 문제와 보기를 추출합니다."""
