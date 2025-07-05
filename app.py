@@ -2,7 +2,7 @@ from flask import Flask, render_template_string, request, session, redirect, url
 import openai
 import os
 import re
-from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
 # ====== 설정 ======
