@@ -1,3 +1,4 @@
+print("앱 시작됨")
 import os
 print("GOOGLE_SERVICE_ACCOUNT_KEY:", os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY"))
 
