@@ -10,6 +10,7 @@ import os
 import re
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -311,6 +312,16 @@ def quick_form():
         form_id = created_form['formId']
         form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
         return f"폼 생성 성공! <a href='{form_url}' target='_blank'>폼 열기</a>"
+    except HttpError as e:
+        import traceback
+        tb = traceback.format_exc()
+        try:
+            content = e.content.decode() if hasattr(e.content, 'decode') else str(e.content)
+        except Exception:
+            content = str(e.content)
+        status = getattr(e, 'resp', None)
+        status_code = status.status if status and hasattr(status, 'status') else ''
+        return f"폼 생성 실패: {e}<br><b>상세 내용:</b><br><pre>{content}</pre><br><b>HTTP 상태코드:</b> {status_code}<br><pre>{tb}</pre>"
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
