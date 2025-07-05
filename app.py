@@ -1,3 +1,6 @@
+import os
+print("GOOGLE_SERVICE_ACCOUNT_KEY:", os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY"))
+
 from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify
 import openai
 import os

@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# 환경변수 및 비밀키
+.env
+*.json
+!rules.txt
+!requirements.txt
+
+# VSCode 설정
+.vscode/ 
