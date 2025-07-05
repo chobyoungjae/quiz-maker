@@ -1,11 +1,21 @@
-from flask import Flask, render_template_string, request, session, redirect, url_for
+from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify
 import openai
 import os
+import re
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+import pickle
 
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 PASSWORD = "1234"  # 접속 비밀번호 설정
+GOOGLE_DRIVE_FOLDER_ID = "1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2"  # 구글 드라이브 폴더 ID
 # ==================
+
+# Google API 설정
+SCOPES = ['https://www.googleapis.com/auth/forms', 'https://www.googleapis.com/auth/drive']
 
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
@@ -30,9 +40,215 @@ HTML_MAIN = """
 {% if result %}
     <h3>생성된 문제</h3>
     <pre style="white-space: pre-wrap;">{{ result }}</pre>
+    <div style="margin-top: 20px;">
+        <button onclick="createGoogleForm()" style="background-color: #4285f4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+            구글설문지로 저장
+        </button>
+        <button onclick="openDriveFolder()" style="background-color: #34a853; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+            저장 폴더 열기
+        </button>
+    </div>
+    <div id="formStatus" style="margin-top: 10px;"></div>
 {% endif %}
 <a href="{{ url_for('logout') }}">로그아웃</a>
+
+<script>
+function createGoogleForm() {
+    const statusDiv = document.getElementById('formStatus');
+    statusDiv.innerHTML = '구글 설문지 생성 중...';
+    
+    fetch('/create_form', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            questions: `{{ result | tojson | safe }}`
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = `구글 설문지가 생성되었습니다! <a href="${data.form_url}" target="_blank">설문지 열기</a>`;
+        } else {
+            statusDiv.innerHTML = '오류: ' + data.error;
+        }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = '오류가 발생했습니다: ' + error;
+    });
+}
+
+function openDriveFolder() {
+    window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
+}
+</script>
 """
+
+def get_google_credentials():
+    """Google API 인증 정보를 가져옵니다."""
+    creds = None
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # 환경변수에서 인증 정보를 가져옵니다
+            client_config = {
+                "installed": {
+                    "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                    "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob"]
+                }
+            }
+            flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+            creds = flow.run_local_server(port=0)
+        
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+    
+    return creds
+
+def parse_questions(text):
+    """문제 텍스트를 파싱하여 문제와 보기를 추출합니다."""
+    questions = []
+    lines = text.split('\n')
+    current_question = None
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # 객관식 문제 패턴 (1. 2. 3. 등)
+        if re.match(r'^\d+\.', line):
+            if current_question:
+                questions.append(current_question)
+            current_question = {
+                'question': line,
+                'options': [],
+                'type': 'multiple_choice'
+            }
+        # 보기 패턴 (1) 2) 3) 4) 등)
+        elif re.match(r'^\d+\)', line) and current_question:
+            current_question['options'].append(line)
+        # 주관식 문제 패턴 (8. 9. 10. 등)
+        elif re.match(r'^[8-9]\.|^10\.', line):
+            if current_question:
+                questions.append(current_question)
+            current_question = {
+                'question': line,
+                'type': 'short_answer'
+            }
+    
+    if current_question:
+        questions.append(current_question)
+    
+    return questions
+
+@app.route("/create_form", methods=["POST"])
+def create_form():
+    """구글 설문지를 생성합니다."""
+    try:
+        data = request.get_json()
+        questions_text = data.get('questions', '')
+        
+        # Google API 인증
+        creds = get_google_credentials()
+        forms_service = build('forms', 'v1', credentials=creds)
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        # 문제 파싱
+        questions = parse_questions(questions_text)
+        
+        # 구글 폼 생성
+        form = {
+            'info': {
+                'title': f'문제 시험 - {session.get("current_topic", "주제")}',
+                'documentTitle': f'문제 시험 - {session.get("current_topic", "주제")}'
+            }
+        }
+        
+        created_form = forms_service.forms().create(body=form).execute()
+        form_id = created_form['formId']
+        
+        # 문제 추가
+        requests = []
+        for i, q in enumerate(questions):
+            if q['type'] == 'multiple_choice' and q['options']:
+                # 객관식 문제
+                request_body = {
+                    'createItem': {
+                        'item': {
+                            'title': q['question'],
+                            'questionItem': {
+                                'question': {
+                                    'choiceQuestion': {
+                                        'type': 'RADIO',
+                                        'options': [{'value': opt} for opt in q['options']],
+                                        'shuffle': False
+                                    }
+                                }
+                            }
+                        },
+                        'location': {
+                            'index': i
+                        }
+                    }
+                }
+            else:
+                # 주관식 문제
+                request_body = {
+                    'createItem': {
+                        'item': {
+                            'title': q['question'],
+                            'questionItem': {
+                                'question': {
+                                    'textQuestion': {
+                                        'type': 'SHORT_ANSWER'
+                                    }
+                                }
+                            }
+                        },
+                        'location': {
+                            'index': i
+                        }
+                    }
+                }
+            requests.append(request_body)
+        
+        # 폼에 문제 추가
+        if requests:
+            forms_service.forms().batchUpdate(
+                formId=form_id,
+                body={'requests': requests}
+            ).execute()
+        
+        # 폼을 지정된 폴더로 이동
+        drive_service.files().update(
+            fileId=form_id,
+            addParents=GOOGLE_DRIVE_FOLDER_ID,
+            removeParents='root'
+        ).execute()
+        
+        form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
+        
+        return jsonify({
+            'success': True,
+            'form_url': form_url,
+            'form_id': form_id
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -55,6 +271,7 @@ def main():
     error = None
     if request.method == "POST":
         topic = request.form["topic"]
+        session["current_topic"] = topic  # 현재 주제를 세션에 저장
         # 규칙 파일 읽기
         try:
             with open("rules.txt", "r", encoding="utf-8") as f:
