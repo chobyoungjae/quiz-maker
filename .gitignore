@@ -12,4 +12,6 @@ __pycache__/
 .vscode/
 
 token.pickle
-token.pickle.b64 
+token.pickle.b64
+
+credentials.json 
