@@ -24,7 +24,7 @@ import pickle
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 PASSWORD = "1234"  # 접속 비밀번호 설정
-GOOGLE_DRIVE_FOLDER_ID = "1l6kTNesmyiCEkQtuCKNrkOkjMkGyzCDA"  # 구글 드라이브 폴더 ID
+GOOGLE_DRIVE_FOLDER_ID = "1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2"  # 구글 드라이브 폴더 ID
 # ==================
 
 # Google API 설정
@@ -93,7 +93,7 @@ function createGoogleForm() {
 }
 
 function openDriveFolder() {
-    window.open('https://drive.google.com/drive/folders/1l6kTNesmyiCEkQtuCKNrkOkjMkGyzCDA', '_blank');
+    window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
 }
 </script>
 """
@@ -244,13 +244,32 @@ def create_form():
             ).execute()
             logging.info("8. 폼에 문제 추가 성공")
         
+        # 설문지 생성 후 폴더 이동
         drive_service.files().update(
             fileId=form_id,
             addParents=GOOGLE_DRIVE_FOLDER_ID,
             removeParents='root'
         ).execute()
         logging.info("9. 폼을 폴더로 이동 성공")
-        
+
+        # 정답/해설 txt 파일도 구글 드라이브 폴더에 업로드
+        import re as _re
+        safe_topic = _re.sub(r'[^\w\d가-힣 _\-]', '', session.get("current_topic", "정답")).strip()
+        answer_filename = f"{safe_topic}.txt"
+        if os.path.exists(answer_filename):
+            file_metadata = {
+                'name': answer_filename,
+                'parents': [GOOGLE_DRIVE_FOLDER_ID]
+            }
+            media = None
+            try:
+                from googleapiclient.http import MediaFileUpload
+                media = MediaFileUpload(answer_filename, mimetype='text/plain')
+                drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+                logging.info(f"정답/해설 txt 파일({answer_filename}) 구글 드라이브 업로드 성공")
+            except Exception as e:
+                logging.error(f"정답/해설 txt 파일 업로드 실패: {e}")
+
         form_url = f"https://docs.google.com/forms/d/{form_id}/edit"
         logging.info("10. 최종 성공, form_url: %s", form_url)
         
