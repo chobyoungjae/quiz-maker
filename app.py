@@ -11,17 +11,20 @@ import re
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+import pickle
 
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 PASSWORD = "1234"  # 접속 비밀번호 설정
-GOOGLE_DRIVE_FOLDER_ID = "1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2"  # 구글 드라이브 폴더 ID
+GOOGLE_DRIVE_FOLDER_ID = "1l6kTNesmyiCEkQtuCKNrkOkjMkGyzCDA"  # 구글 드라이브 폴더 ID
 # ==================
 
 # Google API 설정
 SCOPES = ['https://www.googleapis.com/auth/forms', 'https://www.googleapis.com/auth/drive']
 
-openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+ # openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"  # 세션용
@@ -90,22 +93,20 @@ function openDriveFolder() {
 """
 
 def get_google_credentials():
-    """Google API 인증 정보를 가져옵니다."""
-    try:
-        # 서비스 계정 키 JSON을 환경변수에서 가져옵니다
-        service_account_info = os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
-        if service_account_info:
-            import json
-            service_account_dict = json.loads(service_account_info)
-            creds = Credentials.from_service_account_info(
-                service_account_dict,
-                scopes=SCOPES
-            )
-            return creds
+    creds = None
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
         else:
-            raise Exception("GOOGLE_SERVICE_ACCOUNT_KEY 환경변수가 설정되지 않았습니다.")
-    except Exception as e:
-        raise Exception(f"Google 인증 설정 오류: {str(e)}")
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+    return creds
 
 def parse_questions(text):
     """문제 텍스트를 파싱하여 문제와 보기를 추출합니다."""
@@ -327,6 +328,31 @@ def quick_form():
         tb = traceback.format_exc()
         return f"폼 생성 실패: {e}<br><pre>{tb}</pre>"
 
+# === OAuth 사용자 인증 방식 Google Forms API 테스트 ===
+OAUTH_SCOPES = ['https://www.googleapis.com/auth/forms', 'https://www.googleapis.com/auth/drive']
+
+def get_user_credentials():
+    flow = InstalledAppFlow.from_client_secrets_file(
+        'credentials.json', OAUTH_SCOPES)
+    creds = flow.run_local_server(port=0)
+    return creds
+
+def oauth_create_form():
+    creds = get_user_credentials()
+    service = build('forms', 'v1', credentials=creds)
+    form = {
+        'info': {
+            'title': 'OAuth 테스트 폼'
+        }
+    }
+    created_form = service.forms().create(body=form).execute()
+    print('폼 생성 성공:', created_form['formId'])
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False) 
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'oauth_test':
+        oauth_create_form()
+    else:
+       # openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        port = int(os.environ.get("PORT", 5000))
+        app.run(host="0.0.0.0", port=port, debug=False) 
