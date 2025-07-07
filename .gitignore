@@ -9,4 +9,7 @@ __pycache__/
 !requirements.txt
 
 # VSCode 설정
-.vscode/ 
+.vscode/
+
+token.pickle
+token.pickle.b64 

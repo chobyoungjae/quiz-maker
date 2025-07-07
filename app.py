@@ -3,6 +3,12 @@ logging.basicConfig(level=logging.INFO)
 logging.info("앱 시작됨 (logging)")
 import os
 print("GOOGLE_SERVICE_ACCOUNT_KEY:", os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY"))
+import base64
+
+# token.pickle 복원 (Render 등 서버 환경)
+if os.environ.get("TOKEN_PICKLE_B64") and not os.path.exists("token.pickle"):
+    with open("token.pickle", "wb") as f:
+        f.write(base64.b64decode(os.environ["TOKEN_PICKLE_B64"]))
 
 from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify
 import openai
