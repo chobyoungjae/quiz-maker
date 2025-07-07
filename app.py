@@ -24,7 +24,7 @@ import pickle
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 PASSWORD = "1234"  # 접속 비밀번호 설정
-GOOGLE_DRIVE_FOLDER_ID = "1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2"  # 구글 드라이브 폴더 ID
+GOOGLE_DRIVE_FOLDER_ID = "1l6kTNesmyiCEkQtuCKNrkOkjMkGyzCDA"  # 구글 드라이브 폴더 ID
 # ==================
 
 # Google API 설정
@@ -93,7 +93,7 @@ function createGoogleForm() {
 }
 
 function openDriveFolder() {
-    window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
+    window.open('https://drive.google.com/drive/folders/1l6kTNesmyiCEkQtuCKNrkOkjMkGyzCDA', '_blank');
 }
 </script>
 """
