@@ -115,42 +115,58 @@ def get_google_credentials():
     return creds
 
 def parse_questions(text):
-    """문제 텍스트를 파싱하여 문제와 보기를 추출합니다."""
+    """문제 텍스트를 파싱하여 문제와 보기를 추출합니다. (정답/해설도 함께 파싱)"""
+    import re as _re
     questions = []
     lines = text.split('\n')
     current_question = None
-    for line in lines:
+    for i, line in enumerate(lines):
         line = line.strip()
         if not line:
             continue
         # 객관식 문제 패턴 (1. 2. 3. 4. 5. 6. 7.)
-        if re.match(r'^[1-7]\.', line):
+        m = _re.match(r'^(\d+)\.\s*(.*)', line)
+        if m and 1 <= int(m.group(1)) <= 7:
             if current_question:
                 questions.append(current_question)
             current_question = {
                 'question': line,
                 'options': [],
-                'type': 'multiple_choice'
+                'type': 'multiple_choice',
+                'answer': '',
+                'explanation': ''
             }
         # 보기 패턴 (한 줄에 여러 보기가 있는 경우 포함)
         elif current_question and current_question.get('type') == 'multiple_choice':
-            # '1) 보기1 2) 보기2 3) 보기3 4) 보기4' 형식 분리 (최종 정규식)
-            matches = re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
+            matches = _re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
             if matches:
                 current_question['options'].extend([v.strip() for v in matches if v.strip()])
-            elif re.match(r'^\d+\)', line):
-                # 한 줄에 보기 하나만 있을 때
-                보기_텍스트 = re.sub(r'^\d+\)\s*', '', line)
+            elif _re.match(r'^\d+\)', line):
+                보기_텍스트 = _re.sub(r'^\d+\)\s*', '', line)
                 if 보기_텍스트:
                     current_question['options'].append(보기_텍스트)
+        # 정답/해설 패턴
+        elif current_question and (line.startswith('정답:') or line.startswith('해설:')):
+            if line.startswith('정답:'):
+                current_question['answer'] = line.replace('정답:', '').strip()
+            elif line.startswith('해설:'):
+                current_question['explanation'] = line.replace('해설:', '').strip()
         # 주관식 문제 패턴 (8. 9. 10.)
-        elif re.match(r'^[8-9]\.|^10\.', line):
+        elif m and 8 <= int(m.group(1)) <= 10:
             if current_question:
                 questions.append(current_question)
             current_question = {
                 'question': line,
-                'type': 'short_answer'
+                'type': 'short_answer',
+                'answer': '',
+                'explanation': ''
             }
+        # 주관식 정답/해설
+        elif current_question and current_question.get('type') == 'short_answer' and (line.startswith('정답:') or line.startswith('해설:')):
+            if line.startswith('정답:'):
+                current_question['answer'] = line.replace('정답:', '').strip()
+            elif line.startswith('해설:'):
+                current_question['explanation'] = line.replace('해설:', '').strip()
     if current_question:
         questions.append(current_question)
     return questions
@@ -303,19 +319,23 @@ def main():
             print("OpenAI 응답:", response.choices[0].message.content)
             result = response.choices[0].message.content
             # 문제, 해설/정답 분리 저장
+            import re as _re
+            safe_topic = _re.sub(r'[^\w\d가-힣 _\-]', '', topic).strip()
+            answer_filename = f"{safe_topic}.txt"
             if result and "---------------------------" in result:
                 question_part, answer_part = result.split("---------------------------", 1)
-                # 문제(질문)만 result로 사용 (구글 설문지용)
                 result = question_part.strip()
-                # 해설/정답은 주제명.txt로 저장 (특수문자 제거)
-                import re as _re
-                safe_topic = _re.sub(r'[^\w\d가-힣 _\-]', '', topic).strip()
-                answer_filename = f"{safe_topic}.txt"
                 with open(answer_filename, "w", encoding="utf-8") as f:
                     f.write(answer_part.strip())
             elif result:
-                # 구분선이 없으면 전체를 result로 사용
-                result = result.strip()
+                # 구분선이 없으면 문제/정답/해설을 파싱해서 txt로 저장
+                questions = parse_questions(result)
+                # 화면에는 문제(질문)만 표시
+                result = "\n".join([q['question'] for q in questions])
+                # txt에는 정답/해설만 저장
+                with open(answer_filename, "w", encoding="utf-8") as f:
+                    for idx, q in enumerate(questions, 1):
+                        f.write(f"{idx}. 정답: {q['answer']}\n   해설: {q['explanation']}\n")
         except Exception as e:
             error = str(e)
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, error=error)
