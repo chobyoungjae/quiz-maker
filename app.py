@@ -119,15 +119,10 @@ def parse_questions(text):
     questions = []
     lines = text.split('\n')
     current_question = None
-    in_answer_section = False
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        # 하단 요약 구분선 이후는 무시
-        if line.startswith('---------------------------'):
-            in_answer_section = True
-            break
         # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
         if m and 1 <= int(m.group(1)) <= 10:
