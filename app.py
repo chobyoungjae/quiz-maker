@@ -186,6 +186,13 @@ def create_form():
         for i, q in enumerate(questions):
             if q['type'] == 'multiple_choice' and q.get('options'):
                 # 객관식 문제(보기 있는 것만 추가)
+                # 중복 보기 제거
+                unique_options = []
+                seen = set()
+                for opt in q['options']:
+                    if opt not in seen:
+                        unique_options.append(opt)
+                        seen.add(opt)
                 request_body = {
                     'createItem': {
                         'item': {
@@ -194,7 +201,7 @@ def create_form():
                                 'question': {
                                     'choiceQuestion': {
                                         'type': 'RADIO',
-                                        'options': [{'value': opt} for opt in q['options']],
+                                        'options': [{'value': opt} for opt in unique_options],
                                         'shuffle': False
                                     }
                                 }
