@@ -286,14 +286,26 @@ def main():
             with open("rules.txt", "r", encoding="utf-8") as f:
                 rules = f.read()
             prompt = rules.replace("{topic}", topic)
-            # === OpenAI API 호출 부분 주석 처리 ===
-            # response = openai_client.chat.completions.create(
-            #     model="gpt-4o",
-            #     messages=[{"role": "user", "content": prompt}]
-            # )
-            # result = response.choices[0].message.content
-            # === 임시 더미 데이터 ===
-            result = f"""{topic}에 대한 예시 문제\n1. {topic}의 정의는 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n2. {topic}의 주요 특징은 무엇인가요?\n   1) 보기1 2) 보기2 3) 보기3 4) 보기4\n"""
+            # === OpenAI API 호출 ===
+            openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+            response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2048
+            )
+            print("OpenAI 응답:", response.choices[0].message.content)
+            result = response.choices[0].message.content
+            # 문제, 해설/정답 분리 저장
+            if result and "---------------------------" in result:
+                question_part, answer_part = result.split("---------------------------", 1)
+                # 문제(질문)만 result로 사용 (구글 설문지용)
+                result = question_part.strip()
+                # 해설/정답은 answers.txt로 저장
+                with open("answers.txt", "w", encoding="utf-8") as f:
+                    f.write(answer_part.strip())
+            elif result:
+                # 구분선이 없으면 전체를 result로 사용
+                result = result.strip()
         except Exception as e:
             error = str(e)
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, error=error)
