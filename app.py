@@ -115,28 +115,29 @@ def get_google_credentials():
     return creds
 
 def parse_questions(text):
-    """문제 텍스트를 파싱하여 문제와 보기를 추출합니다. (정답/해설도 함께 파싱)"""
+    """문제 텍스트를 파싱하여 문제, 보기, 정답, 해설을 한 세트로 추출합니다."""
     import re as _re
     questions = []
     lines = text.split('\n')
     current_question = None
-    for i, line in enumerate(lines):
+    for line in lines:
         line = line.strip()
         if not line:
             continue
-        # 객관식 문제 패턴 (1. 2. 3. 4. 5. 6. 7.)
+        # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
-        if m and 1 <= int(m.group(1)) <= 7:
+        if m and 1 <= int(m.group(1)) <= 10:
             if current_question:
                 questions.append(current_question)
+            qtype = 'multiple_choice' if 1 <= int(m.group(1)) <= 7 else 'short_answer'
             current_question = {
                 'question': line,
                 'options': [],
-                'type': 'multiple_choice',
+                'type': qtype,
                 'answer': '',
                 'explanation': ''
             }
-        # 보기 패턴 (한 줄에 여러 보기가 있는 경우 포함)
+        # 객관식 보기
         elif current_question and current_question.get('type') == 'multiple_choice':
             matches = _re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
             if matches:
@@ -145,24 +146,8 @@ def parse_questions(text):
                 보기_텍스트 = _re.sub(r'^\d+\)\s*', '', line)
                 if 보기_텍스트:
                     current_question['options'].append(보기_텍스트)
-        # 정답/해설 패턴
+        # 정답/해설
         elif current_question and (line.startswith('정답:') or line.startswith('해설:')):
-            if line.startswith('정답:'):
-                current_question['answer'] = line.replace('정답:', '').strip()
-            elif line.startswith('해설:'):
-                current_question['explanation'] = line.replace('해설:', '').strip()
-        # 주관식 문제 패턴 (8. 9. 10.)
-        elif m and 8 <= int(m.group(1)) <= 10:
-            if current_question:
-                questions.append(current_question)
-            current_question = {
-                'question': line,
-                'type': 'short_answer',
-                'answer': '',
-                'explanation': ''
-            }
-        # 주관식 정답/해설
-        elif current_question and current_question.get('type') == 'short_answer' and (line.startswith('정답:') or line.startswith('해설:')):
             if line.startswith('정답:'):
                 current_question['answer'] = line.replace('정답:', '').strip()
             elif line.startswith('해설:'):
