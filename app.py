@@ -24,7 +24,7 @@ import pickle
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 PASSWORD = "1234"  # 접속 비밀번호 설정
-GOOGLE_DRIVE_FOLDER_ID = "1l6kTNesmyiCEkQtuCKNrkOkjMkGyzCDA"  # 구글 드라이브 폴더 ID
+GOOGLE_DRIVE_FOLDER_ID = "1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2"  # 구글 드라이브 폴더 ID
 # ==================
 
 # Google API 설정
@@ -300,8 +300,11 @@ def main():
                 question_part, answer_part = result.split("---------------------------", 1)
                 # 문제(질문)만 result로 사용 (구글 설문지용)
                 result = question_part.strip()
-                # 해설/정답은 answers.txt로 저장
-                with open("answers.txt", "w", encoding="utf-8") as f:
+                # 해설/정답은 주제명.txt로 저장 (특수문자 제거)
+                import re as _re
+                safe_topic = _re.sub(r'[^\w\d가-힣 _\-]', '', topic).strip()
+                answer_filename = f"{safe_topic}.txt"
+                with open(answer_filename, "w", encoding="utf-8") as f:
                     f.write(answer_part.strip())
             elif result:
                 # 구분선이 없으면 전체를 result로 사용
