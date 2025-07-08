@@ -1,3 +1,5 @@
+## 문제 생성 웹앱
+
 import logging
 logging.basicConfig(level=logging.INFO)
 logging.info("앱 시작됨 (logging)")
@@ -131,7 +133,7 @@ def parse_questions(text):
         # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
         if m and 1 <= int(m.group(1)) <= 10:
-            if current_question:
+            if current_question is not None:
                 questions.append(current_question)
             qtype = 'multiple_choice' if 1 <= int(m.group(1)) <= 7 else 'short_answer'
             current_question = {
@@ -156,7 +158,8 @@ def parse_questions(text):
                 current_question['answer'] = line.replace('정답:', '').strip()
             elif line.startswith('해설:'):
                 current_question['explanation'] = line.replace('해설:', '').strip()
-    if current_question:
+    # 마지막 문제 추가
+    if current_question is not None:
         questions.append(current_question)
     return questions
 
