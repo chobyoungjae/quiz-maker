@@ -48,10 +48,11 @@ HTML_LOGIN = """
 
 HTML_MAIN = """
 <h2>문제 생성 웹앱</h2>
-<form method="post">
+<form method="post" id="questionForm" onsubmit="return showLoading()">
     <input type="text" name="topic" placeholder="문제 주제 입력" required>
-    <button type="submit">문제 생성</button>
+    <button type="submit" id="genBtn">문제 생성</button>
 </form>
+<div id="loadingMsg" style="color:blue; margin-top:10px; display:none;">문제를 생성중 입니다...</div>
 {% if result %}
     <h3>생성된 문제</h3>
     <pre style="white-space: pre-wrap;">{{ display_text }}</pre>
@@ -68,6 +69,11 @@ HTML_MAIN = """
 <a href="{{ url_for('logout') }}">로그아웃</a>
 
 <script>
+function showLoading() {
+    document.getElementById('genBtn').disabled = true;
+    document.getElementById('loadingMsg').style.display = 'block';
+    return true;
+}
 function createGoogleForm() {
     const statusDiv = document.getElementById('formStatus');
     statusDiv.innerHTML = '구글 설문지 생성 중...';
@@ -345,8 +351,10 @@ def main():
             # txt에는 정답/해설만 저장 (예시 포맷)
             with open(answer_filename, "w", encoding="utf-8") as f:
                 for idx, q in enumerate(questions, 1):
-                    if q['answer'] or q['explanation']:
-                        f.write(f"{idx}. 정답: {q['answer']}\n   해설: {q['explanation']}\n\n")
+                    # 1~7번 객관식도 무조건 정답/해설 줄 출력
+                    answer = q['answer'] if q['answer'] else ''
+                    explanation = q['explanation'] if q['explanation'] else ''
+                    f.write(f"{idx}. 정답: {answer}\n   해설: {explanation}\n\n")
         except Exception as e:
             error = str(e)
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, display_text=display_text, error=error)
