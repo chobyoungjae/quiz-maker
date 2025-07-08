@@ -54,7 +54,7 @@ HTML_MAIN = """
 </form>
 {% if result %}
     <h3>생성된 문제</h3>
-    <pre style="white-space: pre-wrap;">{{ result }}</pre>
+    <pre style="white-space: pre-wrap;">{{ display_text }}</pre>
     <div style="margin-top: 20px;">
         <button onclick="createGoogleForm()" style="background-color: #4285f4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
             구글설문지로 저장
@@ -78,7 +78,7 @@ function createGoogleForm() {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            questions: `{{ result | tojson | safe }}`
+            questions: {{ result | tojson | safe }}
         })
     })
     .then(response => response.json())
@@ -311,6 +311,7 @@ def main():
     if not session.get("login"):
         return redirect(url_for("login"))
     result = None
+    display_text = None
     error = None
     if request.method == "POST":
         topic = request.form["topic"]
@@ -327,28 +328,28 @@ def main():
                 max_tokens=2048
             )
             print("OpenAI 응답:", response.choices[0].message.content)
-            result = response.choices[0].message.content
+            result = response.choices[0].message.content  # 전체(문제+보기+정답+해설+요약)
             # 문제, 해설/정답 분리 저장
             import re as _re
             safe_topic = _re.sub(r'[^\w\d가-힣 _\-]', '', topic).strip()
             answer_filename = f"{safe_topic}.txt"
-            if result and "---------------------------" in result:
-                question_part, answer_part = result.split("---------------------------", 1)
-                result = question_part.strip()
-                with open(answer_filename, "w", encoding="utf-8") as f:
-                    f.write(answer_part.strip())
-            elif result:
-                # 구분선이 없으면 문제/정답/해설을 파싱해서 txt로 저장
-                questions = parse_questions(result)
-                # 화면에는 문제(질문)만 표시
-                result = "\n".join([q['question'] for q in questions])
-                # txt에는 정답/해설만 저장
-                with open(answer_filename, "w", encoding="utf-8") as f:
-                    for idx, q in enumerate(questions, 1):
-                        f.write(f"{idx}. 정답: {q['answer']}\n   해설: {q['explanation']}\n")
+            # 문제+보기만 화면에 표시
+            questions = parse_questions(result)
+            display_text = ""
+            for q in questions:
+                display_text += f"{q['question']}\n"
+                if q['options']:
+                    for idx, opt in enumerate(q['options'], 1):
+                        display_text += f"   {idx}) {opt}\n"
+                display_text += "\n"
+            # txt에는 정답/해설만 저장 (예시 포맷)
+            with open(answer_filename, "w", encoding="utf-8") as f:
+                for idx, q in enumerate(questions, 1):
+                    if q['answer'] or q['explanation']:
+                        f.write(f"{idx}. 정답: {q['answer']}\n   해설: {q['explanation']}\n\n")
         except Exception as e:
             error = str(e)
-    return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, error=error)
+    return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, display_text=display_text, error=error)
 
 @app.route("/logout")
 def logout():
