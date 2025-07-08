@@ -348,13 +348,20 @@ def main():
                     for idx, opt in enumerate(q['options'], 1):
                         display_text += f"   {idx}) {opt}\n"
                 display_text += "\n"
-            # txt에는 정답/해설만 저장 (예시 포맷)
-            with open(answer_filename, "w", encoding="utf-8") as f:
-                for idx, q in enumerate(questions, 1):
-                    # 1~7번 객관식도 무조건 정답/해설 줄 출력
-                    answer = q['answer'] if q['answer'] else ''
-                    explanation = q['explanation'] if q['explanation'] else ''
-                    f.write(f"{idx}. 정답: {answer}\n   해설: {explanation}\n\n")
+            # 정답/해설 txt 저장: rules.txt 예시처럼
+            if result and "---------------------------" in result:
+                answer_part = result.split("---------------------------", 1)[1]
+                if "정답과 해설 정리:" in answer_part:
+                    answer_part = answer_part.split("정답과 해설 정리:", 1)[1]
+                answer_part = answer_part.strip()
+                with open(answer_filename, "w", encoding="utf-8") as f:
+                    f.write(answer_part)
+            else:
+                with open(answer_filename, "w", encoding="utf-8") as f:
+                    for idx, q in enumerate(questions, 1):
+                        answer = q['answer'] if q['answer'] else ''
+                        explanation = q['explanation'] if q['explanation'] else ''
+                        f.write(f"{idx}. 정답: {answer}\n   해설: {explanation}\n\n")
         except Exception as e:
             error = str(e)
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, display_text=display_text, error=error)
