@@ -127,18 +127,15 @@ def parse_questions(text):
     questions = []
     lines = text.split('\n')
     current_question = None
-    in_answer_section = False
+    parsing_started = False
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        # 하단 요약 구분선 이후는 무시
-        if line.startswith('---------------------------'):
-            in_answer_section = True
-            break
-        # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
+        # 문제 번호(1~10)로 시작하는 줄부터 파싱 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
         if m and 1 <= int(m.group(1)) <= 10:
+            parsing_started = True
             if current_question is not None:
                 questions.append(current_question)
             qtype = 'multiple_choice' if 1 <= int(m.group(1)) <= 7 else 'short_answer'
@@ -149,6 +146,8 @@ def parse_questions(text):
                 'answer': '',
                 'explanation': ''
             }
+        elif not parsing_started:
+            continue
         # 객관식 보기
         elif current_question and current_question.get('type') == 'multiple_choice':
             matches = _re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
