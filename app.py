@@ -48,11 +48,14 @@ HTML_LOGIN = """
 
 HTML_MAIN = """
 <h2>문제 생성 웹앱</h2>
-<form method="post">
+<form method="post" onsubmit="showLoading()">
     <input type="text" name="topic" placeholder="문제 주제 입력" required>
     <button type="submit">문제 생성</button>
 </form>
+<div id="loadingMsg" style="color:blue; margin-top:10px;"></div>
 {% if result %}
+    <div style="color:green; font-weight:bold;">문제가 성공적으로 생성되었습니다!</div>
+    <div style="font-weight:bold; margin-bottom:8px;">주제: {{ session['current_topic'] }}</div>
     <h3>생성된 문제</h3>
     <pre style="white-space: pre-wrap;">{{ result }}</pre>
     <div style="margin-top: 20px;">
@@ -96,6 +99,9 @@ function createGoogleForm() {
 
 function openDriveFolder() {
     window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
+}
+function showLoading() {
+    document.getElementById('loadingMsg').innerText = '문제 생성 중입니다... 잠시만 기다려주세요.';
 }
 </script>
 """
