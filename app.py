@@ -14,7 +14,7 @@ if os.environ.get("TOKEN_PICKLE_B64") and not os.path.exists("token.pickle"):
 
 from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify
 import openai
-import os
+import osㅇ
 import re
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -48,14 +48,11 @@ HTML_LOGIN = """
 
 HTML_MAIN = """
 <h2>문제 생성 웹앱</h2>
-<form method="post" onsubmit="showLoading()">
+<form method="post">
     <input type="text" name="topic" placeholder="문제 주제 입력" required>
     <button type="submit">문제 생성</button>
 </form>
-<div id="loadingMsg" style="color:blue; margin-top:10px;"></div>
 {% if result %}
-    <div style="color:green; font-weight:bold;">문제가 성공적으로 생성되었습니다!</div>
-    <div style="font-weight:bold; margin-bottom:8px;">주제: {{ session['current_topic'] }}</div>
     <h3>생성된 문제</h3>
     <pre style="white-space: pre-wrap;">{{ result }}</pre>
     <div style="margin-top: 20px;">
@@ -100,9 +97,6 @@ function createGoogleForm() {
 function openDriveFolder() {
     window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
 }
-function showLoading() {
-    document.getElementById('loadingMsg').innerText = '문제 생성 중입니다... 잠시만 기다려주세요.';
-}
 </script>
 """
 
@@ -127,16 +121,19 @@ def parse_questions(text):
     questions = []
     lines = text.split('\n')
     current_question = None
-    parsing_started = False
+    in_answer_section = False
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        # 문제 번호(1~10)로 시작하는 줄부터 파싱 시작
+        # 하단 요약 구분선 이후는 무시
+        if line.startswith('---------------------------'):
+            in_answer_section = True
+            break
+        # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
         if m and 1 <= int(m.group(1)) <= 10:
-            parsing_started = True
-            if current_question is not None:
+            if current_question:
                 questions.append(current_question)
             qtype = 'multiple_choice' if 1 <= int(m.group(1)) <= 7 else 'short_answer'
             current_question = {
@@ -146,8 +143,6 @@ def parse_questions(text):
                 'answer': '',
                 'explanation': ''
             }
-        elif not parsing_started:
-            continue
         # 객관식 보기
         elif current_question and current_question.get('type') == 'multiple_choice':
             matches = _re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
@@ -163,8 +158,7 @@ def parse_questions(text):
                 current_question['answer'] = line.replace('정답:', '').strip()
             elif line.startswith('해설:'):
                 current_question['explanation'] = line.replace('해설:', '').strip()
-    # 마지막 문제 추가
-    if current_question is not None:
+    if current_question:
         questions.append(current_question)
     return questions
 
