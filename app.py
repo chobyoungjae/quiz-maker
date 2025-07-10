@@ -367,19 +367,40 @@ def main():
                     for idx, opt in enumerate(q['options'], 1):
                         display_text += f"   {idx}) {opt}\n"
                 display_text += "\n"
-            # 정답/해설 txt 저장: rules.txt 예시처럼
+            # 정답/해설 txt 저장: 1~10번만, 11~20번 등 반복/빈 값/중복 없이 저장
             if result and "---------------------------" in result:
                 answer_part = result.split("---------------------------", 1)[1]
                 if "정답과 해설 정리:" in answer_part:
                     answer_part = answer_part.split("정답과 해설 정리:", 1)[1]
                 answer_part = answer_part.strip()
+                # 줄 단위로 읽어서 1~10번까지만 저장
+                answer_lines = answer_part.splitlines()
+                filtered_lines = []
+                count = 0
+                for line in answer_lines:
+                    # 1~10번 정답/해설만 저장 (빈 줄/빈 값/11번 이상/중복 방지)
+                    if count >= 10:
+                        break
+                    if line.strip() == "" or not re.match(r"^\d+\. ", line):
+                        continue
+                    filtered_lines.append(line)
+                    count += 1
+                    # 다음 줄이 해설이면 같이 저장
+                    idx = answer_lines.index(line)
+                    if idx+1 < len(answer_lines):
+                        next_line = answer_lines[idx+1]
+                        if next_line.strip().startswith("해설:"):
+                            filtered_lines.append(next_line)
                 with open(answer_filename, "w", encoding="utf-8") as f:
-                    f.write(answer_part)
+                    f.write("\n".join(filtered_lines))
             else:
+                # fallback: questions에서 1~10번 answer/explanation만 저장
                 with open(answer_filename, "w", encoding="utf-8") as f:
-                    for idx, q in enumerate(questions, 1):
+                    for idx, q in enumerate(questions[:10], 1):
                         answer = q['answer'] if q['answer'] else ''
                         explanation = q['explanation'] if q['explanation'] else ''
+                        if not answer and not explanation:
+                            continue
                         f.write(f"{idx}. 정답: {answer}\n   해설: {explanation}\n\n")
         except Exception as e:
             error = str(e)
