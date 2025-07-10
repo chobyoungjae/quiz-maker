@@ -12,7 +12,7 @@ if os.environ.get("TOKEN_PICKLE_B64") and not os.path.exists("token.pickle"):
     with open("token.pickle", "wb") as f:
         f.write(base64.b64decode(os.environ["TOKEN_PICKLE_B64"]))
 
-from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify
+from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify, send_file
 import openai
 import os
 import re
@@ -22,6 +22,9 @@ from googleapiclient.errors import HttpError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pickle
+import io
+import openpyxl
+from docx import Document
 
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -57,11 +60,21 @@ HTML_MAIN = """
     <h3>생성된 문제</h3>
     <pre style="white-space: pre-wrap;">{{ display_text }}</pre>
     <div style="margin-top: 20px;">
+        <!-- 구글설문지로 저장 버튼 주석처리
         <button onclick="createGoogleForm()" style="background-color: #4285f4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
             구글설문지로 저장
         </button>
+        -->
+        <!-- 저장 폴더 열기 버튼 주석처리
         <button onclick="openDriveFolder()" style="background-color: #34a853; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
             저장 폴더 열기
+        </button>
+        -->
+        <button onclick="downloadExcel()" style="background-color: #fbbc05; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+            다운로드(엑셀)
+        </button>
+        <button onclick="downloadHwp()" style="background-color: #673ab7; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+            다운로드(한글)
         </button>
     </div>
     <div id="formStatus" style="margin-top: 10px;"></div>
@@ -74,10 +87,11 @@ function showLoading() {
     document.getElementById('loadingMsg').style.display = 'block';
     return true;
 }
+// 구글설문지로 저장 버튼 주석처리
+/*
 function createGoogleForm() {
     const statusDiv = document.getElementById('formStatus');
     statusDiv.innerHTML = '구글 설문지 생성 중...';
-    
     fetch('/create_form', {
         method: 'POST',
         headers: {
@@ -99,9 +113,38 @@ function createGoogleForm() {
         statusDiv.innerHTML = '오류가 발생했습니다: ' + error;
     });
 }
-
+*/
+// 저장 폴더 열기 버튼 주석처리
+/*
 function openDriveFolder() {
     window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
+}
+*/
+function downloadExcel() {
+    fetch('/download_excel', {method: 'POST'})
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'quiz.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+}
+function downloadHwp() {
+    fetch('/download_hwp', {method: 'POST'})
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'quiz.docx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
 }
 </script>
 """
@@ -331,6 +374,37 @@ def login():
             error = "비밀번호가 틀렸습니다."
     return render_template_string(HTML_LOGIN, error=error)
 
+# 엑셀 다운로드 라우트
+@app.route('/download_excel', methods=['POST'])
+def download_excel():
+    display_text = session.get('display_text', None)
+    if not display_text or not isinstance(display_text, str) or not display_text.strip():
+        return 'No data', 400
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = '문제'
+    for row in display_text.split('\n'):
+        ws.append([row])
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='quiz.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+# 한글(실제는 docx) 다운로드 라우트
+@app.route('/download_hwp', methods=['POST'])
+def download_hwp():
+    display_text = session.get('display_text', None)
+    if not display_text or not isinstance(display_text, str) or not display_text.strip():
+        return 'No data', 400
+    doc = Document()
+    for line in display_text.split('\n'):
+        doc.add_paragraph(line)
+    output = io.BytesIO()
+    doc.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='quiz.docx', mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+# main 함수에서 display_text를 세션에 저장하도록 보완
 @app.route("/main", methods=["GET", "POST"])
 def main():
     if not session.get("login"):
@@ -376,13 +450,17 @@ def main():
                 with open(answer_filename, "w", encoding="utf-8") as f:
                     f.write(answer_part)
             else:
+                # 정답/해설 요약이 없으면 자동 생성
                 with open(answer_filename, "w", encoding="utf-8") as f:
+                    f.write("---------------------------\n정답과 해설 정리:\n\n")
                     for idx, q in enumerate(questions, 1):
                         answer = q['answer'] if q['answer'] else ''
                         explanation = q['explanation'] if q['explanation'] else ''
                         f.write(f"{idx}. 정답: {answer}\n   해설: {explanation}\n\n")
         except Exception as e:
             error = str(e)
+        # 화면에 보이는 문제를 세션에 저장 (다운로드용)
+        session['display_text'] = display_text
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, display_text=display_text, error=error)
 
 @app.route("/logout")
