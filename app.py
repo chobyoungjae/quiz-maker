@@ -122,12 +122,33 @@ def get_google_credentials():
             pickle.dump(creds, token)
     return creds
 
+def get_answer_format_from_rules():
+    """rules.txt에서 정답/해설 접두사를 읽어옴 (없으면 기본값)"""
+    try:
+        with open("rules.txt", "r", encoding="utf-8") as f:
+            rules_content = f.read()
+        import re
+        answer_prefix = "정답:"
+        explanation_prefix = "해설:"
+        # rules.txt에서 첫 번째 정답:, 해설: 접두사 추출
+        answer_match = re.search(r"^정답:\s*", rules_content, re.MULTILINE)
+        explanation_match = re.search(r"^해설:\s*", rules_content, re.MULTILINE)
+        if answer_match:
+            answer_prefix = answer_match.group(0).strip()
+        if explanation_match:
+            explanation_prefix = explanation_match.group(0).strip()
+        return answer_prefix, explanation_prefix
+    except:
+        return "정답:", "해설:"
+
+
 def parse_questions(text):
     import re as _re
     questions = []
     lines = text.split('\n')
     current_question = None
     in_answer_section = False
+    answer_prefix, explanation_prefix = get_answer_format_from_rules()
     for line in lines:
         line = line.strip()
         if not line:
@@ -136,35 +157,33 @@ def parse_questions(text):
         if line.startswith('---------------------------'):
             in_answer_section = True
             break
-        # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
+        # 문제 번호로 시작하는 줄이면 새 문제 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
-        if m and 1 <= int(m.group(1)) <= 10:
+        if m:
             if current_question:
+                # 보기가 없으면 주관식으로 설정
+                if not current_question['options']:
+                    current_question['type'] = 'short_answer'
                 questions.append(current_question)
-            qtype = 'multiple_choice' if 1 <= int(m.group(1)) <= 7 else 'short_answer'
             current_question = {
                 'question': line,
                 'options': [],
-                'type': qtype,
+                'type': 'multiple_choice',  # 일단 객관식으로 시작, 보기 없으면 나중에 주관식으로 변경
                 'answer': '',
                 'explanation': ''
             }
-        # 객관식 보기
-        elif current_question and current_question.get('type') == 'multiple_choice':
-            matches = _re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
-            if matches:
-                current_question['options'].extend([v.strip() for v in matches if v.strip()])
-            elif _re.match(r'^\d+\)', line):
-                보기_텍스트 = _re.sub(r'^\d+\)\s*', '', line)
-                if 보기_텍스트:
-                    current_question['options'].append(보기_텍스트)
-        # 정답/해설
-        elif current_question and (line.startswith('정답:') or line.startswith('해설:')):
-            if line.startswith('정답:'):
-                current_question['answer'] = line.replace('정답:', '').strip()
-            elif line.startswith('해설:'):
-                current_question['explanation'] = line.replace('해설:', '').strip()
+        # 객관식 보기(1), 2), 3), 4))
+        elif current_question and _re.match(r'^[1-9]\)', line):
+            current_question['options'].append(_re.sub(r'^[1-9]\)\s*', '', line))
+        # 정답/해설 (rules.txt에서 읽은 접두사 사용)
+        elif current_question and (line.startswith(answer_prefix) or line.startswith(explanation_prefix)):
+            if line.startswith(answer_prefix):
+                current_question['answer'] = line.replace(answer_prefix, '').strip()
+            elif line.startswith(explanation_prefix):
+                current_question['explanation'] = line.replace(explanation_prefix, '').strip()
     if current_question:
+        if not current_question['options']:
+            current_question['type'] = 'short_answer'
         questions.append(current_question)
     return questions
 
