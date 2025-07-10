@@ -12,7 +12,7 @@ if os.environ.get("TOKEN_PICKLE_B64") and not os.path.exists("token.pickle"):
     with open("token.pickle", "wb") as f:
         f.write(base64.b64decode(os.environ["TOKEN_PICKLE_B64"]))
 
-from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify, send_file
+from flask import Flask, render_template_string, request, session, redirect, url_for, jsonify
 import openai
 import os
 import re
@@ -22,9 +22,6 @@ from googleapiclient.errors import HttpError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pickle
-import io
-import openpyxl
-from docx import Document
 
 # ====== 설정 ======
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -60,21 +57,11 @@ HTML_MAIN = """
     <h3>생성된 문제</h3>
     <pre style="white-space: pre-wrap;">{{ display_text }}</pre>
     <div style="margin-top: 20px;">
-        <!-- 구글설문지로 저장 버튼 주석처리
         <button onclick="createGoogleForm()" style="background-color: #4285f4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
             구글설문지로 저장
         </button>
-        -->
-        <!-- 저장 폴더 열기 버튼 주석처리
         <button onclick="openDriveFolder()" style="background-color: #34a853; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
             저장 폴더 열기
-        </button>
-        -->
-        <button onclick="downloadExcel()" style="background-color: #fbbc05; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
-            다운로드(엑셀)
-        </button>
-        <button onclick="downloadHwp()" style="background-color: #673ab7; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
-            다운로드(한글)
         </button>
     </div>
     <div id="formStatus" style="margin-top: 10px;"></div>
@@ -87,11 +74,10 @@ function showLoading() {
     document.getElementById('loadingMsg').style.display = 'block';
     return true;
 }
-// 구글설문지로 저장 버튼 주석처리
-/*
 function createGoogleForm() {
     const statusDiv = document.getElementById('formStatus');
     statusDiv.innerHTML = '구글 설문지 생성 중...';
+    
     fetch('/create_form', {
         method: 'POST',
         headers: {
@@ -113,38 +99,9 @@ function createGoogleForm() {
         statusDiv.innerHTML = '오류가 발생했습니다: ' + error;
     });
 }
-*/
-// 저장 폴더 열기 버튼 주석처리
-/*
+
 function openDriveFolder() {
     window.open('https://drive.google.com/drive/folders/1U0YMJe4dHRBpYuBpkw0RWGwe0xKP5Kd2', '_blank');
-}
-*/
-function downloadExcel() {
-    fetch('/download_excel', {method: 'POST'})
-      .then(response => response.blob())
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'quiz.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      });
-}
-function downloadHwp() {
-    fetch('/download_hwp', {method: 'POST'})
-      .then(response => response.blob())
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'quiz.docx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      });
 }
 </script>
 """
@@ -165,33 +122,12 @@ def get_google_credentials():
             pickle.dump(creds, token)
     return creds
 
-def get_answer_format_from_rules():
-    """rules.txt에서 정답/해설 접두사를 읽어옴 (없으면 기본값)"""
-    try:
-        with open("rules.txt", "r", encoding="utf-8") as f:
-            rules_content = f.read()
-        import re
-        answer_prefix = "정답:"
-        explanation_prefix = "해설:"
-        # rules.txt에서 첫 번째 정답:, 해설: 접두사 추출
-        answer_match = re.search(r"^정답:\s*", rules_content, re.MULTILINE)
-        explanation_match = re.search(r"^해설:\s*", rules_content, re.MULTILINE)
-        if answer_match:
-            answer_prefix = answer_match.group(0).strip()
-        if explanation_match:
-            explanation_prefix = explanation_match.group(0).strip()
-        return answer_prefix, explanation_prefix
-    except:
-        return "정답:", "해설:"
-
-
 def parse_questions(text):
     import re as _re
     questions = []
     lines = text.split('\n')
     current_question = None
     in_answer_section = False
-    answer_prefix, explanation_prefix = get_answer_format_from_rules()
     for line in lines:
         line = line.strip()
         if not line:
@@ -200,33 +136,35 @@ def parse_questions(text):
         if line.startswith('---------------------------'):
             in_answer_section = True
             break
-        # 문제 번호로 시작하는 줄이면 새 문제 시작
+        # 문제 번호(1~10)로 시작하는 줄이면 무조건 새 current_question 시작
         m = _re.match(r'^(\d+)\.\s*(.*)', line)
-        if m:
+        if m and 1 <= int(m.group(1)) <= 10:
             if current_question:
-                # 보기가 없으면 주관식으로 설정
-                if not current_question['options']:
-                    current_question['type'] = 'short_answer'
                 questions.append(current_question)
+            qtype = 'multiple_choice' if 1 <= int(m.group(1)) <= 7 else 'short_answer'
             current_question = {
                 'question': line,
                 'options': [],
-                'type': 'multiple_choice',  # 일단 객관식으로 시작, 보기 없으면 나중에 주관식으로 변경
+                'type': qtype,
                 'answer': '',
                 'explanation': ''
             }
-        # 객관식 보기(1), 2), 3), 4))
-        elif current_question and _re.match(r'^[1-9]\)', line):
-            current_question['options'].append(_re.sub(r'^[1-9]\)\s*', '', line))
-        # 정답/해설 (rules.txt에서 읽은 접두사 사용)
-        elif current_question and (line.startswith(answer_prefix) or line.startswith(explanation_prefix)):
-            if line.startswith(answer_prefix):
-                current_question['answer'] = line.replace(answer_prefix, '').strip()
-            elif line.startswith(explanation_prefix):
-                current_question['explanation'] = line.replace(explanation_prefix, '').strip()
+        # 객관식 보기
+        elif current_question and current_question.get('type') == 'multiple_choice':
+            matches = _re.findall(r'\d+\)\s*([^)]*?)(?=\s*\d+\)|$)', line)
+            if matches:
+                current_question['options'].extend([v.strip() for v in matches if v.strip()])
+            elif _re.match(r'^\d+\)', line):
+                보기_텍스트 = _re.sub(r'^\d+\)\s*', '', line)
+                if 보기_텍스트:
+                    current_question['options'].append(보기_텍스트)
+        # 정답/해설
+        elif current_question and (line.startswith('정답:') or line.startswith('해설:')):
+            if line.startswith('정답:'):
+                current_question['answer'] = line.replace('정답:', '').strip()
+            elif line.startswith('해설:'):
+                current_question['explanation'] = line.replace('해설:', '').strip()
     if current_question:
-        if not current_question['options']:
-            current_question['type'] = 'short_answer'
         questions.append(current_question)
     return questions
 
@@ -374,37 +312,6 @@ def login():
             error = "비밀번호가 틀렸습니다."
     return render_template_string(HTML_LOGIN, error=error)
 
-# 엑셀 다운로드 라우트
-@app.route('/download_excel', methods=['POST'])
-def download_excel():
-    display_text = session.get('display_text', None)
-    if not display_text or not isinstance(display_text, str) or not display_text.strip():
-        return 'No data', 400
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = '문제'
-    for row in display_text.split('\n'):
-        ws.append([row])
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return send_file(output, as_attachment=True, download_name='quiz.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-# 한글(실제는 docx) 다운로드 라우트
-@app.route('/download_hwp', methods=['POST'])
-def download_hwp():
-    display_text = session.get('display_text', None)
-    if not display_text or not isinstance(display_text, str) or not display_text.strip():
-        return 'No data', 400
-    doc = Document()
-    for line in display_text.split('\n'):
-        doc.add_paragraph(line)
-    output = io.BytesIO()
-    doc.save(output)
-    output.seek(0)
-    return send_file(output, as_attachment=True, download_name='quiz.docx', mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-
-# main 함수에서 display_text를 세션에 저장하도록 보완
 @app.route("/main", methods=["GET", "POST"])
 def main():
     if not session.get("login"):
@@ -450,17 +357,13 @@ def main():
                 with open(answer_filename, "w", encoding="utf-8") as f:
                     f.write(answer_part)
             else:
-                # 정답/해설 요약이 없으면 자동 생성
                 with open(answer_filename, "w", encoding="utf-8") as f:
-                    f.write("---------------------------\n정답과 해설 정리:\n\n")
                     for idx, q in enumerate(questions, 1):
                         answer = q['answer'] if q['answer'] else ''
                         explanation = q['explanation'] if q['explanation'] else ''
                         f.write(f"{idx}. 정답: {answer}\n   해설: {explanation}\n\n")
         except Exception as e:
             error = str(e)
-        # 화면에 보이는 문제를 세션에 저장 (다운로드용)
-        session['display_text'] = display_text
     return render_template_string(HTML_MAIN + "{% if error %}<p style='color:red;'>{{ error }}</p>{% endif %}", result=result, display_text=display_text, error=error)
 
 @app.route("/logout")
